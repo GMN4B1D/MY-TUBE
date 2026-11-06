@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Full Quality Downloader</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body {
+      background: #0f0f0f;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: #1a1a1a;
+      border-radius: 18px;
+      padding: 36px;
+      max-width: 520px;
+      width: 100%;
+      box-shadow: 0 15px 50px rgba(0,0,0,0.6);
+    }
+    h1 { font-size: 1.7rem; margin-bottom: 6px; }
+    .subtitle { color: #aaa; margin-bottom: 28px; font-size: 0.95rem; }
+    input {
+      width: 100%;
+      padding: 15px 16px;
+      border-radius: 12px;
+      border: 1px solid #333;
+      background: #111;
+      color: #fff;
+      font-size: 1rem;
+      margin-bottom: 16px;
+      outline: none;
+    }
+    input:focus { border-color: #ff0000; }
+    button {
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 12px;
+      background: #ff0000;
+      color: white;
+      font-size: 1.05rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    button:hover { background: #cc0000; }
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-top: 20px;
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      display: none;
+    }
+    .status.loading {
+      display: block;
+      background: #1e3a5f;
+      color: #7dd3fc;
+    }
+    .status.error {
+      display: block;
+      background: #3f1d1d;
+      color: #fca5a5;
+    }
+    .status.success {
+      display: block;
+      background: #14332a;
+      color: #6ee7b7;
+    }
+    .progress {
+      margin-top: 12px;
+      height: 6px;
+      background: #333;
+      border-radius: 4px;
+      overflow: hidden;
+      display: none;
+    }
+    .progress-bar {
+      height: 100%;
+      background: #ff0000;
+      width: 0%;
+      transition: width 0.3s;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>YouTube Downloader</h1>
+    <p class="subtitle">ফুল কোয়ালিটিতে ডাউনলোড করো</p>
+
+    <input type="text" id="url" placeholder="YouTube লিংক এখানে পেস্ট করো..." autocomplete="off">
+    
+    <button id="btn" onclick="startDownload()">ডাউনলোড শুরু করো</button>
+
+    <div class="progress" id="progress">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    const BACKEND = "https://media-downloader-1-z19u.onrender.com";
+
+    async function startDownload() {
+      const url = document.getElementById('url').value.trim();
+      const btn = document.getElementById('btn');
+      const status = document.getElementById('status');
+      const progress = document.getElementById('progress');
+      const progressBar = document.getElementById('progressBar');
+
+      if (!url) {
+        showStatus('error', 'দয়া করে একটা YouTube লিংক দাও');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'ডাউনলোড হচ্ছে...';
+      progress.style.display = 'block';
+      progressBar.style.width = '15%';
+      showStatus('loading', 'ভিডিও প্রসেস করা হচ্ছে... একটু অপেক্ষা করো');
+
+      try {
+        const response = await fetch(`${BACKEND}/download`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ url: url })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+
+        progressBar.style.width = '70%';
+        showStatus('loading', 'ফাইল ডাউনলোড হচ্ছে...');
+
+        const blob = await response.blob();
+        progressBar.style.width = '100%';
+
+        // ফাইলের নাম বের করার চেষ্টা
+        let filename = 'youtube_video.mp4';
+        const disposition = response.headers.get('Content-Disposition');
+        if (disposition && disposition.includes('filename=')) {
+          filename = disposition.split('filename=')[1].replace(/['"]/g, '');
+        }
+
+        // ডাউনলোড ট্রিগার
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(downloadUrl);
+
+        showStatus('success', 'ডাউনলোড শুরু হয়েছে!');
+      } catch (err) {
+        console.error(err);
+        showStatus('error', 'ডাউনলোড ব্যর্থ হয়েছে। আবার চেষ্টা করো।');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'ডাউনলোড শুরু করো';
+        setTimeout(() => {
+          progress.style.display = 'none';
+          progressBar.style.width = '0%';
+        }, 2000);
+      }
+    }
+
+    function showStatus(type, message) {
+      const status = document.getElementById('status');
+      status.className = `status ${type}`;
+      status.textContent = message;
+    }
+
+    // Enter চাপলেও কাজ করবে
+    document.getElementById('url').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') startDownload();
+    });
+  </script>
+</body>
+</html>
